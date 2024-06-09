@@ -1,49 +1,67 @@
-import { Logger, LogLevel } from "./library/Logger.ts"
-import { EventDispatcher } from "./library/EventDispatcher.ts"
+import { RAFScheduler } from "./library/RAFScheduler.ts"
 
-// Logger
+/**
+ * The App class initializes the RAFScheduler and sets up various tasks.
+ */
+class App {
 
-const logger = new Logger( LogLevel.DEBUG, {
-	[ LogLevel.DEBUG ]: { color: "white", backgroundColor: "black", padding: "2px 8px", borderRadius: "2px" },
-	[ LogLevel.INFO ]: { color: "black", backgroundColor: "lightblue", padding: "2px 8px", borderRadius: "2px" },
-	[ LogLevel.WARN ]: { color: "black", backgroundColor: "yellow", padding: "2px 8px", borderRadius: "2px" },
-	[ LogLevel.ERROR ]: { color: "black", backgroundColor: "red", padding: "2px 8px", borderRadius: "2px" }
-} )
+	scheduler: RAFScheduler
 
-// EventDispatcher
+	/**
+	 * Constructs the App instance, initializes the scheduler, and sets up tasks.
+	 */
+	constructor() {
 
-const dispatcher = new EventDispatcher()
+		this.scheduler = new RAFScheduler()
+		this.setup()
+	}
 
-// Register an event listener
-dispatcher.on( "event1", ( event: CustomEvent ) => {
+	/**
+	 * Starts executing the scheduled tasks.
+	 */
+	run() {
 
-	logger.info( `event1 triggered: ${ event.detail[ 0 ].someData }` )
-} )
+		this.scheduler.exec()
+	}
 
-dispatcher.exec( "event1", { someData: "example" } )
+	/**
+	 * Sets up the tasks for the scheduler.
+	 * - Schedules the update method to run at regular intervals.
+	 * - Locks the update method after 5 seconds.
+	 * - Unlocks the update method after 10 seconds.
+	 * - Cancels the update method and clears the console after 15 seconds.
+	 */
+	private setup() {
 
-// Check if an event has listeners
-logger.info( `has event1: ${ dispatcher.has( "event1" ) }` ) // true
+		// Schedule the update method to run at regular intervals
+		this.scheduler.interval( this.update )
 
-// Lock an event callback
-const callback = ( event: CustomEvent ) => {
+		// Lock the update method after 5 seconds
+		this.scheduler.timeout( () => this.scheduler.lock( this.update ), 5_000 )
 
-	logger.info( `locked event: ${ event.detail[ 0 ].someData }` )
+		// Unlock the update method after 10 seconds
+		this.scheduler.timeout( () => this.scheduler.unlock( this.update ), 10_000 )
+
+		// Cancel the update method and clear the console after 15 seconds
+		this.scheduler.timeout( () => {
+
+			this.scheduler.cancel( this.update )
+			console.clear()
+
+		}, 15_000 )
+	}
+
+	/**
+	 * The update method logs "updating..." along with the elapsed time in seconds.
+	 * @param {Object} param - The parameter object.
+	 * @param {number} param.elapsed - The elapsed time in seconds.
+	 */
+	private update( { elapsed }: { elapsed: number } ) {
+
+		console.log( "updating...", elapsed )
+	}
 }
-dispatcher.on( "event2", callback )
-dispatcher.lock( "event2", callback )
-dispatcher.exec( "event2", { someData: "example" } ) // callback will not be called
 
-// Unlock an event callback
-dispatcher.unlock( "event2", callback )
-dispatcher.exec( "event2", { someData: "example" } ) // callback will be called
-
-// Cancel an event callback
-dispatcher.cancel( "event1" )
-logger.info( `has event1: ${ dispatcher.has( "event1" ) }` ) // false
-
-// Check if an event callback is locked
-logger.info( `event2 is locked: ${ dispatcher.isLocked( "event2", callback ) }` ) // false
-
-// Check how many times an event has been dispatched
-logger.info( `count of dispatches (event1): ${ dispatcher.getDispatchCount( "event1" ) }` ) // 1
+// Create a new App instance and start executing tasks
+const app = new App()
+app.run()
