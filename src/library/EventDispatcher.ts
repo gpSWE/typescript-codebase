@@ -73,12 +73,16 @@ export class EventDispatcher {
 	 */
 	on<T = any>( type: string, cb: EventCallback<T> ): void {
 
+		// If the event type does not have any registered callbacks, initialize a new Set for it
 		if ( !this._callbacks.has( type ) ) {
 
 			this._callbacks.set( type, new Set() )
 		}
 
+		// Add the callback to the set of callbacks for this event type
 		this._callbacks.get( type )!.add( cb )
+		
+		// Register the callback with the internal EventTarget
 		this._eventTarget.addEventListener( type, cb as EventListener )
 	}
 
@@ -89,14 +93,19 @@ export class EventDispatcher {
 	 */
 	once<T = any>( type: string, cb: EventCallback<T> ): void {
 
+		// Create a wrapper function that will call the callback and then remove itself
 		const onceWrapper = ( event: Event ) => {
 
 			cb( event as CustomEvent<T> )
 
+			// Remove the wrapper after it has been called
 			this._eventTarget.removeEventListener( type, onceWrapper )
 		}
 
+		// Map the original callback to the wrapper function
 		this._onceCallbacks.set( cb, onceWrapper as EventCallback )
+
+		// Register the wrapper function with the internal EventTarget
 		this._eventTarget.addEventListener( type, onceWrapper )
 	}
 
@@ -107,11 +116,13 @@ export class EventDispatcher {
 	 */
 	exec<T = any>( type: string, ...args: T[] ): void {
 
+		// If there are locked callbacks for this event type, handle them separately
 		if ( this._lockedEvents.has( type ) ) {
 
 			const lockedCallbacks = this._lockedEvents.get( type )!
 			const event = new CustomEvent( type, { detail: args } )
 
+			// Call each callback that is not locked
 			for ( const callback of this._callbacks.get( type )! ) {
 
 				if ( !lockedCallbacks.has( callback ) ) {
@@ -122,6 +133,7 @@ export class EventDispatcher {
 		}
 		else {
 
+			// Dispatch the event normally using the internal EventTarget
 			const event = new CustomEvent( type, { detail: args } )
 			this._eventTarget.dispatchEvent( event )
 		}
@@ -144,6 +156,7 @@ export class EventDispatcher {
 	 */
 	lock( type: string, cb: EventCallback | null = null ): void {
 
+		// If there are no locked callbacks for this event type, initialize a new Set
 		if ( !this._lockedEvents.has( type ) ) {
 
 			this._lockedEvents.set( type, new Set() )
@@ -151,10 +164,12 @@ export class EventDispatcher {
 
 		if ( cb ) {
 
+			// Lock the specific callback
 			this._lockedEvents.get( type )!.add( cb )
 		}
 		else {
 
+			// Lock all callbacks for the event type
 			for ( const callback of this._callbacks.get( type )! ) {
 
 				this._lockedEvents.get( type )!.add( callback )
@@ -173,8 +188,10 @@ export class EventDispatcher {
 
 			if ( cb ) {
 
+				// Unlock the specific callback
 				this._lockedEvents.get( type )!.delete( cb )
 
+				// If no more callbacks are locked for this event type, remove the entry
 				if ( this._lockedEvents.get( type )!.size === 0 ) {
 
 					this._lockedEvents.delete( type )
@@ -182,6 +199,7 @@ export class EventDispatcher {
 			}
 			else {
 
+				// Unlock all callbacks for the event type
 				this._lockedEvents.delete( type )
 			}
 		}
@@ -196,15 +214,18 @@ export class EventDispatcher {
 
 		if ( cb ) {
 
+			// Remove the specific callback from the internal EventTarget
 			this._eventTarget.removeEventListener( type, cb as EventListener )
 
 			if ( this._callbacks.has( type ) ) {
 
+				// Remove the callback from the set of callbacks
 				this._callbacks.get( type )!.delete( cb )
 			}
 
 			if ( this._onceCallbacks.has( cb ) ) {
 
+				// Remove the wrapper callback for one-time events
 				this._eventTarget.removeEventListener( type, this._onceCallbacks.get( cb )! as EventListener )
 				this._onceCallbacks.delete( cb )
 			}
@@ -213,6 +234,7 @@ export class EventDispatcher {
 
 			if ( this._callbacks.has( type ) ) {
 
+				// Remove all callbacks for the event type
 				for ( const callback of this._callbacks.get( type )! ) {
 
 					this._eventTarget.removeEventListener( type, callback as EventListener )
@@ -233,10 +255,12 @@ export class EventDispatcher {
 
 		if ( cb ) {
 
+			// Check if the specific callback is registered for the event type
 			return this._callbacks.has( type ) && this._callbacks.get( type )!.has( cb )
 		}
 		else {
 
+			// Check if there are any callbacks registered for the event type
 			return this._callbacks.has( type ) && this._callbacks.get( type )!.size > 0
 		}
 	}
@@ -259,6 +283,7 @@ export class EventDispatcher {
 
 				if ( callbacks && callbacks.has( cb ) ) {
 
+					// Get the dispatch count for the event type
 					count += this._eventCounts.get( type )!
 				}
 			}
@@ -267,6 +292,7 @@ export class EventDispatcher {
 		}
 		else {
 
+			// Get the dispatch count for the event type
 			return this._eventCounts.get( type ) || 0
 		}
 	}
@@ -281,15 +307,18 @@ export class EventDispatcher {
 
 		if ( !this._lockedEvents.has( type ) ) {
 
+			// Return false if there are no locked callbacks for this event type
 			return false
 		}
 
 		if ( cb ) {
 
+			// Check if the specific callback is locked
 			return this._lockedEvents.get( type )!.has( cb )
 		}
 		else {
 
+			// Check if any callback for the event type is locked
 			return this._lockedEvents.get( type )!.size > 0
 		}
 	}
